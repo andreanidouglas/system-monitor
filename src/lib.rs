@@ -2,7 +2,9 @@ use anyhow::Context;
 use get_sys_info::{data::readable_byte, saturating_sub_bytes, Duration, Platform, System};
 use std::sync::{Arc, Mutex};
 
-enum Metric {
+
+#[derive(Copy, Clone)]
+pub enum Metric {
     CpuAverage(f32),
     CpuTemp(f32),
     MemTotal(readable_byte),
@@ -26,6 +28,16 @@ impl SysMonitor {
             metrics: Arc::new(Mutex::new(Vec::new())),
             reading_cpu: None,
         }
+    }
+
+    pub fn metrics(&self) -> anyhow::Result<Vec<Metric>> {
+        let mut mv = Vec::new();
+        let metrics = self.metrics.clone();
+        for m in metrics.lock().expect("").iter() {
+            mv.push(m.clone());
+        }
+
+        Ok(mv)
     }
 
     pub fn update(&mut self) -> anyhow::Result<()> {
@@ -63,8 +75,8 @@ impl SysMonitor {
         let binding = self.sys.clone();
         let sys = binding.lock().expect("could not lock sys on main thread");
 
-        let cpu_temp = sys.cpu_temp().context("could not load cpu temp")?;
-        metrics.push(Metric::CpuTemp(cpu_temp));
+        //let cpu_temp = sys.cpu_temp().context("could not load cpu temp")?;
+        //metrics.push(Metric::CpuTemp(cpu_temp));
 
         let memory = sys.memory().context("could not load memory metrics")?;
         let mem_free = memory.free;

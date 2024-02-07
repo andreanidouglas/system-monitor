@@ -2,7 +2,6 @@ use anyhow::Context;
 use get_sys_info::{data::readable_byte, saturating_sub_bytes, Duration, Platform, System};
 use std::sync::{Arc, Mutex};
 
-
 #[derive(Copy, Clone)]
 pub enum Metric {
     CpuAverage(f32),
@@ -22,9 +21,9 @@ pub struct SysMonitor {
 }
 
 impl SysMonitor {
-    pub fn new(sys: System) -> Self {
+    pub fn new(sys: Arc<Mutex<System>>) -> Self {
         Self {
-            sys: Arc::new(Mutex::new(sys)),
+            sys,
             metrics: Arc::new(Mutex::new(Vec::new())),
             reading_cpu: None,
         }
@@ -44,10 +43,18 @@ impl SysMonitor {
         let sys = self.sys.clone();
         let metrics = self.metrics.clone();
 
+        loadaverage(&sys.clone(), &metrics.clone())?;
+
         if let Some(rcpu) = self.reading_cpu.take() {
             match rcpu.is_finished() {
                 true => rcpu.join().expect("could not join thread"),
-                false => self.reading_cpu = Some(rcpu),
+                false => {
+                    self.reading_cpu = Some(rcpu);
+                    metrics
+                        .lock()
+                        .expect("could not lock metrics")
+                        .push(Metric::CpuAverage(0.0))
+                }
             }
         } else {
             self.reading_cpu = Some(std::thread::spawn(move || {
@@ -55,16 +62,20 @@ impl SysMonitor {
                 let sys = binding.lock().expect("could not lock sys on cpu thread");
                 let cpu_load = sys.cpu_load_aggregate().expect("could not read CPU avg");
                 drop(sys);
+                metrics
+                    .lock()
+                    .expect("could not lock metrics")
+                    .push(Metric::CpuAverage(0.0));
 
                 // by doc you should wait one second before reading the cpu info
                 std::thread::sleep(Duration::from_secs(1));
 
+                let cpu_user = cpu_load.done().expect("could not get user load").user;
+
                 metrics
                     .lock()
                     .expect("could not lock metrics on cpu thread")
-                    .push(Metric::CpuAverage(
-                        cpu_load.done().expect("could not get user load").user,
-                    ));
+                    .push(Metric::CpuAverage(cpu_user));
             }));
         }
 
@@ -75,8 +86,9 @@ impl SysMonitor {
         let binding = self.sys.clone();
         let sys = binding.lock().expect("could not lock sys on main thread");
 
-        //let cpu_temp = sys.cpu_temp().context("could not load cpu temp")?;
-        //metrics.push(Metric::CpuTemp(cpu_temp));
+        if let Ok(v) = sys.cpu_temp() {
+            metrics.push(Metric::CpuTemp(v))
+        };
 
         let memory = sys.memory().context("could not load memory metrics")?;
         let mem_free = memory.free;
@@ -89,13 +101,27 @@ impl SysMonitor {
         let uptime = sys.uptime().context("could not read uptime")?;
         metrics.push(Metric::Uptime(uptime));
 
-        let load_average = sys
-            .load_average()
-            .context("could not read load_average metrics")?;
-        metrics.push(Metric::LoadAverage1(load_average.one));
-        metrics.push(Metric::LoadAverage5(load_average.five));
-        metrics.push(Metric::LoadAverage15(load_average.fifteen));
-
         Ok(())
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn loadaverage(sys: &Arc<Mutex<System>>, metrics: &Arc<Mutex<Vec<Metric>>>) -> anyhow::Result<()> {
+    let sys = sys.lock().expect("could not lock system information");
+    let mut metrics = metrics.lock().expect("could not lock metrics");
+
+    let load_average = sys
+        .load_average()
+        .context("could not read load_average metrics")?;
+    metrics.push(Metric::LoadAverage1(load_average.one));
+    metrics.push(Metric::LoadAverage5(load_average.five));
+    metrics.push(Metric::LoadAverage15(load_average.fifteen));
+
+    Ok(())
+}
+
+// windows does not supports load average
+#[cfg(target_os = "windows")]
+fn loadaverage(sys: &Arc<Mutex<System>>, metrics: &Arc<Mutex<Vec<Metric>>>) -> anyhow::Result<()> {
+    Ok(())
 }

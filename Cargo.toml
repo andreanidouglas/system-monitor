@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.71"
-crosscurses = "0.1.0"
+crosscurses = {version = "0.1.0", features = ["win32"] }
 env_logger = "0.10.0"
 get_sys_info = "0.1.21"
 log = "0.4.18"

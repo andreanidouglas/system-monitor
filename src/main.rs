@@ -1,4 +1,7 @@
-use std::{thread, sync::{Arc, Mutex}};
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use crosscurses::{endwin, initscr, Window};
 use get_sys_info::{Duration, Platform, System};
@@ -53,7 +56,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
         match window.getch() {
-            Some(crosscurses::Input::Character(x)) if x == 'q' => break 'outer,
+            Some(crosscurses::Input::Character('q')) => break 'outer,
             None => (),
             _ => (),
         }

@@ -33,7 +33,7 @@ impl SysMonitor {
         let mut mv = Vec::new();
         let metrics = self.metrics.clone();
         for m in metrics.lock().expect("").iter() {
-            mv.push(m.clone());
+            mv.push(*m);
         }
 
         Ok(mv)
@@ -122,6 +122,9 @@ fn loadaverage(sys: &Arc<Mutex<System>>, metrics: &Arc<Mutex<Vec<Metric>>>) -> a
 
 // windows does not supports load average
 #[cfg(target_os = "windows")]
-fn loadaverage(sys: &Arc<Mutex<System>>, metrics: &Arc<Mutex<Vec<Metric>>>) -> anyhow::Result<()> {
+fn loadaverage(
+    _sys: &Arc<Mutex<System>>,
+    _metrics: &Arc<Mutex<Vec<Metric>>>,
+) -> anyhow::Result<()> {
     Ok(())
 }

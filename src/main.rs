@@ -1,10 +1,7 @@
-use std::{
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::thread;
+use std::time::Duration;
 
 use crosscurses::{endwin, initscr, Window};
-use get_sys_info::{Duration, Platform, System};
 use memory_monitor::SysMonitor;
 
 fn printw(window: &Window, y: i32, x: i32, value: &str) {
@@ -15,9 +12,8 @@ fn main() -> anyhow::Result<()> {
     let window = initscr();
     window.nodelay(true);
 
-    let system = Arc::new(Mutex::new(System::new()));
 
-    let mut sysmonitor = SysMonitor::new(system);
+    let mut sysmonitor = SysMonitor::new();
     'outer: loop {
         window.refresh();
 

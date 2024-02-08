@@ -1,6 +1,6 @@
 use anyhow::Context;
 use get_sys_info::{data::readable_byte, saturating_sub_bytes, Duration, Platform, System};
-use std::sync::{Arc, Mutex};
+use std::{sync::{Arc, Mutex}, thread};
 
 #[derive(Copy, Clone)]
 pub enum Metric {
@@ -21,9 +21,9 @@ pub struct SysMonitor {
 }
 
 impl SysMonitor {
-    pub fn new(sys: Arc<Mutex<System>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            sys,
+            sys: Arc::new(Mutex::new(System::new())),
             metrics: Arc::new(Mutex::new(Vec::new())),
             reading_cpu: None,
         }
@@ -100,6 +100,8 @@ impl SysMonitor {
 
         let uptime = sys.uptime().context("could not read uptime")?;
         metrics.push(Metric::Uptime(uptime));
+
+        thread::sleep(Duration::from_millis(300));
 
         Ok(())
     }

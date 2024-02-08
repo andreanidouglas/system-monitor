@@ -20,6 +20,12 @@ pub struct SysMonitor {
     reading_cpu: Option<std::thread::JoinHandle<()>>,
 }
 
+impl Default for SysMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SysMonitor {
     pub fn new() -> Self {
         Self {
